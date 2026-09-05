@@ -1,3 +1,34 @@
+# v2.0.24
+## 09/03/2026
+
+1. [](#new)
+    * **A dependency can now name the generation of Grav it is for.** A plugin that supports both 1.7 and 2.0 often needs a different version of the same dependency on each, so a `dependencies` entry takes an optional `grav` key: `- { name: form, version: '>=9.1.0', grav: '2.0' }`. Entries without it apply everywhere, so existing blueprints are unchanged. See [Plugin Compatibility](https://learn.getgrav.org/20/plugins/plugin-compatibility#requiring-different-versions-per-grav-generation)
+    * A new `system.images.progressive_jpeg` setting, on by default, controls whether resized and cached JPEGs are saved as progressive
+
+1. [](#bugfix)
+    * Installing a package whose dependency is not in the GPM index now says so and carries on, instead of stopping the command with a PHP fatal error. A plugin that still asks for the Grav 1.7 admin plugin was enough to trigger it [getgrav/grav-premium-issues#618](https://github.com/getgrav/grav-premium-issues/issues/618)
+    * A plugin that asks for the `admin` plugin now has that read as Admin 2 on Grav 2, so a plugin written for both 1.7 and 2.0 installs instead of failing on a dependency that cannot exist there. The version it asks for is not carried over, because it describes the old admin's numbering [getgrav/grav-premium-issues#618](https://github.com/getgrav/grav-premium-issues/issues/618)
+    * Any other dependency that cannot be installed on this generation of Grav is now left out of the install rather than attempted and failed
+    * A JSON request whose body is a bare scalar (`"text"`, `12345`, `true`) sent with `Content-Type: application/json` no longer answers a 500 from the request pipeline before any route runs. It is treated as an empty body, so a plugin's webhook or API route gets to answer it, log it and refuse it itself. With `errors.display` on, the old failure also printed a stack trace with server paths to whoever sent it
+    * An image default such as `resize` set in `system.images.defaults` works again. Every image manipulation was being skipped since 2.0.22, leaving only the loading and decoding hints [#4282](https://github.com/getgrav/grav/issues/4282)
+    * Settings such as `loading: lazy` now stay on the image when `link` is also on, instead of moving onto the surrounding link where the browser never sees them [#4282](https://github.com/getgrav/grav/issues/4282)
+    * Resized and cached JPEGs are saved as progressive again, so a photo appears as a whole blurry image that sharpens instead of filling in one line at a time. It has been Grav's default since 2014 but silently stopped working in 1.4.6 [#4284](https://github.com/getgrav/grav/issues/4284)
+    * A media file's own settings from `media.yaml` are no longer overwritten the moment the image is opened, so custom default filters for an image type work again
+    * A URL typed with a trailing slash no longer errors out on a site that has the debugger switched on and the Login plugin protecting page media, because the debug bar is now skipped on redirects, where there is no page to put it on [#4280](https://github.com/getgrav/grav/issues/4280)
+    * With the optional `system.session.read_and_close` setting turned on, a change made to the session early in a request is no longer thrown away by a later write in that same request, and a message added just before a redirect now reaches the page it was meant for [#4281](https://github.com/getgrav/grav/issues/4281)
+
+# v2.0.23
+## 09/02/2026
+
+1. [](#improved)
+    * `composer.json` now declares the `ctype` and `session` extensions it has always used, and suggests `fileinfo` and `simplexml`. Installing with `composer create-project` on a machine missing one of these no longer quietly walks back to a years-old release of Grav instead of failing [#4273](https://github.com/getgrav/grav/discussions/4273)
+1. [](#bugfix)
+    * Reading the browser name, platform or version no longer raises a PHP deprecation notice when a request arrives with no user agent, which is every request from a bare script or a health check
+    * Opening Clockwork before anything has been profiled, on a fresh install or right after `bin/grav clear`, now reports that there is no data yet instead of failing with a 500
+    * A `GRAV_CONFIG__` override set to `true` or `false` now reaches the configuration as a real yes/no value instead of the word itself, so switching something off from a `.env` file or the server environment actually switches it off. Thanks to @nerdyjan for the report and @AdilAzhariOmsan for the fix [#4277](https://github.com/getgrav/grav/issues/4277)
+    * `Uri::ip()` now reads the visitor's address from `$_SERVER`, falling back to the environment, so hosts that don't hand request variables to PHP's environment no longer report every visitor as `UNKNOWN`. Anything that counts per address there, such as the Login plugin's failed-login lockout and per-IP rate limiting, had been sharing a single bucket. Thanks to @sandymac [#2507](https://github.com/getgrav/grav/issues/2507)
+    * On those same hosts the `system.http_x_forwarded` options for `ip`, `client_ip` and `cf_connecting_ip` had no effect at all, and now work as documented. If you turned one on and saw nothing change, turn it back off unless the site really is behind a proxy that overwrites that header
+
 # v2.0.22
 ## 08/31/2026
 

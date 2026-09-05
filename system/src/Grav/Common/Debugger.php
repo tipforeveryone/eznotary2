@@ -394,17 +394,28 @@ class Debugger
 
         $storage = $clockwork->getStorage();
 
-        if ($direction === 'previous') {
-            $data = $storage->previous($id, $count);
-        } elseif ($direction === 'next') {
-            $data = $storage->next($id, $count);
-        } elseif ($direction === 'latest' || $id === 'latest') {
-            $data = $storage->latest();
-        } else {
-            $data = $storage->find($id);
+        // Nothing profiled yet — a fresh install, or the first request after
+        // `bin/grav clear` — means `cache://clockwork/index` does not exist, and
+        // Clockwork's FileStorage fopen()s it unguarded. That warning becomes an
+        // ErrorException under the error handler, so a request that should just
+        // report "no data yet" came back as a 500 instead of the 404 below.
+        try {
+            if ($direction === 'previous') {
+                $data = $storage->previous($id, $count);
+            } elseif ($direction === 'next') {
+                $data = $storage->next($id, $count);
+            } elseif ($direction === 'latest' || $id === 'latest') {
+                $data = $storage->latest();
+            } else {
+                $data = $storage->find($id);
+            }
+        } catch (Throwable) {
+            $data = null;
         }
 
-        if (preg_match('#(?<id>[0-9-]+|latest)/extended#', $path)) {
+        // `latest()` returns false rather than null on empty storage, which
+        // extendRequest() would reject on its `?Request` parameter.
+        if ($data && preg_match('#(?<id>[0-9-]+|latest)/extended#', $path)) {
             $clockwork->extendRequest($data);
         }
 
@@ -704,9 +715,21 @@ class Debugger
     public function render()
     {
         if ($this->enabled && $this->debugbar) {
-            // Only add assets if Page is HTML
+            // The bar is HTML injected into the response body, and the renderer that
+            // produces it only exists once addAssets() has run -- so there is nothing
+            // to inject on a response that never got that far. Test for that before
+            // asking for `page`: a request that returns early from InitializeProcessor
+            // (the trailing slash redirect, for one) never resolved a page, and
+            // resolving one here would build the pages index and run the
+            // onPageFallBackUrl hooks this late, against plugin services that
+            // onPluginsInitialized never got to register -- Login's `user` among them.
+            if (!$this->renderer || !$this->grav->initialized('page')) {
+                return $this;
+            }
+
+            // Only render the bar if the page is HTML.
             $page = $this->grav['page'];
-            if (!$this->renderer || $page->templateFormat() !== 'html') {
+            if ($page->templateFormat() !== 'html') {
                 return $this;
             }
 
